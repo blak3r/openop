@@ -22,11 +22,18 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using CSShellExtContextMenuHandler.Properties;
 using System.Drawing;
+using System.Collections.Generic;
+using System.IO;
+
+
 #endregion
 
 
+///http://www.codeproject.com/Articles/174369/How-to-Write-Windows-Shell-Extension-with-NET-Lang?msg=4466755#xx4466755xx
+///http://msdn.microsoft.com/en-us/library/bb776881.aspx
 namespace CSShellExtContextMenuHandler
 {
+
     [ClassInterface(ClassInterfaceType.None)]
     [Guid("B1F1405D-94A1-4692-B72F-FC8CAF8B8700"), ComVisible(true)]
     public class FileContextMenuExt : IShellExtInit, IContextMenu
@@ -34,12 +41,15 @@ namespace CSShellExtContextMenuHandler
         // The name of the selected file.
         private string selectedFile;
 
-        private string menuText = "&Display File Name (C#)";
+        private string menuText = "Smart Copy";
         private IntPtr menuBmp = IntPtr.Zero;
         private string verb = "csdisplay";
         private string verbCanonicalName = "CSDisplayFileName";
         private string verbHelpText = "Display File Name (C#)";
         private uint IDM_DISPLAY = 0;
+
+        private uint itemCount = 0;
+        private Dictionary<int, string> pathMap = new Dictionary<int, string>();
 
 
         public FileContextMenuExt()
@@ -47,7 +57,7 @@ namespace CSShellExtContextMenuHandler
             // Load the bitmap for the menu item.
             Bitmap bmp = Resources.OK;
             bmp.MakeTransparent(bmp.GetPixel(0, 0));
-            this.menuBmp = bmp.GetHbitmap();
+            this.menuBmp = bmp.GetHbitmap(); // TODO change.
         }
 
         ~FileContextMenuExt()
@@ -62,6 +72,7 @@ namespace CSShellExtContextMenuHandler
 
         void OnVerbDisplayFileName(IntPtr hWnd)
         {
+            // TODO implement a copy here.
             System.Windows.Forms.MessageBox.Show(
                 "The selected file is \r\n\r\n" + this.selectedFile,
                 "CSShellExtContextMenuHandler");
@@ -243,12 +254,14 @@ namespace CSShellExtContextMenuHandler
                 return WinError.MAKE_HRESULT(WinError.SEVERITY_SUCCESS, 0, 0);
             }
 
-            // Use either InsertMenu or InsertMenuItem to add menu items.
+
+            // ORIGINAL
+           // Use either InsertMenu or InsertMenuItem to add menu items.
+            /*
             MENUITEMINFO mii = new MENUITEMINFO();
             mii.cbSize = (uint)Marshal.SizeOf(mii);
-            mii.fMask = MIIM.MIIM_BITMAP | MIIM.MIIM_STRING | MIIM.MIIM_FTYPE | 
-                MIIM.MIIM_ID | MIIM.MIIM_STATE;
-            mii.wID = idCmdFirst + IDM_DISPLAY;
+            mii.fMask = MIIM.MIIM_BITMAP | MIIM.MIIM_STRING | MIIM.MIIM_FTYPE | MIIM.MIIM_ID | MIIM.MIIM_STATE;
+            mii.wID = idCmdFirst + itemCount++;
             mii.fType = MFT.MFT_STRING;
             mii.dwTypeData = this.menuText;
             mii.fState = MFS.MFS_ENABLED;
@@ -257,22 +270,92 @@ namespace CSShellExtContextMenuHandler
             {
                 return Marshal.GetHRForLastWin32Error();
             }
+            */
 
-            // Add a separator.
-            MENUITEMINFO sep = new MENUITEMINFO();
-            sep.cbSize = (uint)Marshal.SizeOf(sep);
-            sep.fMask = MIIM.MIIM_TYPE;
-            sep.fType = MFT.MFT_SEPARATOR;
-            if (!NativeMethods.InsertMenuItem(hMenu, iMenu + 1, true, ref sep))
+            IntPtr hSubMenu = NativeMethods.CreatePopupMenu();
+
+            // PARENT!!!
+            MENUITEMINFO mii2 = new MENUITEMINFO();
+            mii2.cbSize = (uint)Marshal.SizeOf(mii2);
+            mii2.fMask = MIIM.MIIM_BITMAP | MIIM.MIIM_SUBMENU | MIIM.MIIM_STRING | MIIM.MIIM_FTYPE | MIIM.MIIM_ID | MIIM.MIIM_STATE;
+            mii2.hSubMenu = hSubMenu;
+            mii2.wID = idCmdFirst + itemCount;
+            mii2.fType = MFT.MFT_STRING;
+            mii2.dwTypeData = this.menuText;
+            mii2.fState = MFS.MFS_ENABLED;
+            mii2.hbmpItem = this.menuBmp;
+
+
+            uint subItemCount = 0;
+            
+            SHDocVw.ShellWindows shellWindows = new SHDocVw.ShellWindows(); 
+            string filename;
+
+            foreach (SHDocVw.InternetExplorer ie in shellWindows)
+            {
+            
+                /*
+            string[] paths = {"path1", "path2", "path3"};
+            foreach(string s in paths ) {
+                */
+                
+                filename = Path.GetFileNameWithoutExtension(ie.FullName).ToLower();
+
+
+                if (filename.Equals("explorer"))
+                {
+                    string ExplorerWindowPath = ie.LocationURL;
+                    ExplorerWindowPath = ExplorerWindowPath.Replace("file:///", "");
+
+                    // Filters out the current explorer window
+
+                    // Had a file in c:\ and it matched c:\alertus-dev...
+                    if (/*Path.GetDirectoryName(selectedFile) != Path.GetDirectoryName(ExplorerWindowPath) && */
+                        !String.IsNullOrEmpty(ExplorerWindowPath) )
+                    {
+                          // Subitem1
+                        MENUITEMINFO mii3 = new MENUITEMINFO();
+                        mii3.cbSize = (uint)Marshal.SizeOf(mii2);
+                        mii3.fMask = MIIM.MIIM_STRING | MIIM.MIIM_FTYPE | MIIM.MIIM_ID | MIIM.MIIM_STATE;
+                        mii3.wID = idCmdFirst + itemCount;
+                        mii3.fType = MFT.MFT_STRING;
+                        mii3.dwTypeData = ExplorerWindowPath;
+                        mii3.fState = MFS.MFS_ENABLED;
+                        //mii3.hbmpItem = this.menuBmp;
+                        if (!NativeMethods.InsertMenuItem(hSubMenu, subItemCount++, true, ref mii3))
+                        {
+                            return Marshal.GetHRForLastWin32Error();
+                        }
+
+                        pathMap.Add((int)itemCount, ExplorerWindowPath);
+                        itemCount++;
+                    }
+                }
+            }
+
+
+
+
+
+
+            // Adding the POPUP Menu
+            if (!NativeMethods.InsertMenuItem(hMenu, iMenu + 0, true, ref mii2))
             {
                 return Marshal.GetHRForLastWin32Error();
             }
+
+            
+
+
+
+
+
 
             // Return an HRESULT value with the severity set to SEVERITY_SUCCESS. 
             // Set the code value to the offset of the largest command identifier 
             // that was assigned, plus one (1).
             return WinError.MAKE_HRESULT(WinError.SEVERITY_SUCCESS, 0,
-                IDM_DISPLAY + 1);
+                IDM_DISPLAY + itemCount);
         }
 
         /// <summary>
@@ -327,6 +410,9 @@ namespace CSShellExtContextMenuHandler
                 }
                 else
                 {
+                    string verb = Marshal.PtrToStringAnsi(ici.verb);
+                    System.Windows.Forms.MessageBox.Show("Ansi - " + verb);
+
                     // If the verb is not recognized by the context menu handler, it 
                     // must return E_FAIL to allow it to be passed on to the other 
                     // context menu handlers that might implement that verb.
@@ -345,6 +431,9 @@ namespace CSShellExtContextMenuHandler
                 }
                 else
                 {
+                    string verb = Marshal.PtrToStringAnsi(iciex.verbW);
+                    System.Windows.Forms.MessageBox.Show("Unicode - " + verb);
+
                     // If the verb is not recognized by the context menu handler, it 
                     // must return E_FAIL to allow it to be passed on to the other 
                     // context menu handlers that might implement that verb.
@@ -356,11 +445,38 @@ namespace CSShellExtContextMenuHandler
             // check the identifier offset.
             else
             {
-                // Is the command identifier offset supported by this context menu 
-                // extension?
-                if (NativeMethods.LowWord(ici.verb.ToInt32()) == IDM_DISPLAY)
+                int verb = NativeMethods.LowWord(ici.verb.ToInt32());
+
+                string temp = "start "; 
+                    
+                // Loop over pairs with foreach
+                foreach (KeyValuePair<int, string> pair in pathMap)
                 {
-                    OnVerbDisplayFileName(ici.hwnd);
+                    temp += pair.Key + " " + pair.Value + "     ";
+                }
+
+
+
+                //System.Windows.Forms.MessageBox.Show(verb.ToString() + temp);
+                if (pathMap.ContainsKey(verb))
+                {
+                    //System.Windows.Forms.MessageBox.Show(pathMap[verb]);
+
+                    if (System.Windows.Forms.DialogResult.OK ==
+                        System.Windows.Forms.MessageBox.Show("Copy " + selectedFile + " to " + pathMap[verb] + "?", "Confirm Copy", System.Windows.Forms.MessageBoxButtons.OKCancel))
+                    {
+                        //System.Windows.Forms.MessageBox.Show("copying...");
+                        try
+                        {
+                            File.Copy(this.selectedFile, Path.Combine(pathMap[verb], Path.GetFileName(this.selectedFile)) );
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Windows.Forms.MessageBox.Show("Unable to Copy: " + ex.Message);
+                        }
+                    }
+
+                    //System.Windows.Forms.MessageBox.Show("done...");
                 }
                 else
                 {

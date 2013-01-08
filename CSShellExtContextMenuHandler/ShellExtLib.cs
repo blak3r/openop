@@ -450,6 +450,9 @@ namespace CSShellExtContextMenuHandler
         [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern bool DeleteObject(IntPtr hObject);
 
+        [DllImport("user32.dll")]
+        public static extern IntPtr CreatePopupMenu();
+
 
         public static int HighWord(int number)
         {
