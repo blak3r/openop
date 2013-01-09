@@ -32,4 +32,4 @@ This project is written in C#.
 2. There is code in here to get a list of all the open explorer windows and their relevant paths.
 3. Useful reference for how to create a Shell Extension in C# (Managed Code).  With the release of .NET 4.0 Microsoft _originally_ said managed code could be used for Shell Extensions since the "CLR in 4.0 can be hosted side by side with other versions in the same process".  They wrote a MSDN article on how to create a managed shell extension which they later retracted because they didn't know the long term reprocussions of this approach.  I figured it was good enough for my needs and used that article as the basis for my project.
 
-![gitimg](https://gitimg.com/blak3r/openop/readme/increment)
+![gitimg](https://gitimg.com/blak3r/openop/readme/track)
